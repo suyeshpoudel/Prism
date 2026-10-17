@@ -7,6 +7,7 @@ from app.core.errors import (
     InvalidRequestError,
     UnsupportedMediaTypeError,
 )
+from app.main import create_app
 from app.processing.validation import (
     ensure_pdf_magic,
     ensure_size_within_limit,
@@ -176,6 +177,49 @@ def test_get_unknown_document_returns_404(client):
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "document_not_found"
+
+
+def test_upload_returns_chunks_with_source_metadata(client, pdf_bytes):
+    response = client.post(
+        "/api/v1/documents",
+        files={"file": ("research.pdf", pdf_bytes, "application/pdf")},
+    )
+
+    body = response.json()
+    assert body["chunk_count"] == len(body["chunks"]) >= 1
+    for chunk in body["chunks"]:
+        assert chunk["document_id"] == body["id"]
+        assert chunk["id"].startswith(f"{body['id']}:")
+        page = body["pages"][chunk["page_number"] - 1]
+        assert page["text"][chunk["start_offset"] : chunk["end_offset"]] == chunk["text"]
+
+
+def test_upload_respects_chunk_settings_from_settings(pdf_bytes):
+    from fastapi.testclient import TestClient
+
+    from app.config import Settings
+
+    app_client = TestClient(
+        create_app(Settings(max_upload_bytes=1_000_000, chunk_size=20, chunk_overlap=5))
+    )
+    response = app_client.post(
+        "/api/v1/documents",
+        files={"file": ("research.pdf", pdf_bytes, "application/pdf")},
+    )
+
+    body = response.json()
+    assert body["chunk_count"] > 1
+    assert all(chunk["char_count"] <= 20 for chunk in body["chunks"])
+
+
+def test_list_includes_chunk_count(client, pdf_bytes):
+    client.post(
+        "/api/v1/documents",
+        files={"file": ("research.pdf", pdf_bytes, "application/pdf")},
+    )
+
+    summaries = client.get("/api/v1/documents").json()
+    assert summaries[0]["chunk_count"] >= 1
 
 
 def test_validate_media_type_helpers():

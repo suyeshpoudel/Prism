@@ -11,8 +11,8 @@ currently contains the **FastAPI backend**; Milestone 1 is complete.
 | Milestone | Description | Status |
 |-----------|-------------|--------|
 | 1 | FastAPI app, health endpoint, PDF upload + page-level extraction, validation, tests | **Done** |
-| 2 | Chunking with page metadata + edge-case tests | Next |
-| 3 | Local embeddings, NumPy cosine retrieval, retrieval benchmark | Planned |
+| 2 | Chunking with page metadata + edge-case tests | **Done** |
+| 3 | Local embeddings, NumPy cosine retrieval, retrieval benchmark | Next |
 | 4 | PostgreSQL persistence + ownership/access control | Planned |
 | 5 | Grounded answer generation + citations | Planned |
 | 6 | Next.js UI, evaluation lab, Docker | Planned |
@@ -62,6 +62,8 @@ Environment variables use the `PRISM_` prefix (or a `.env` file):
 | `PRISM_ENVIRONMENT` | `development` | Environment label |
 | `PRISM_API_V1_PREFIX` | `/api/v1` | API prefix |
 | `PRISM_MAX_UPLOAD_BYTES` | `10485760` (10 MB) | Upload size limit |
+| `PRISM_CHUNK_SIZE` | `1000` | Target characters per chunk |
+| `PRISM_CHUNK_OVERLAP` | `150` | Characters shared between consecutive chunks (must be < chunk size) |
 
 ## API
 
@@ -90,8 +92,21 @@ Response (abridged):
   "size_bytes": 1212,
   "page_count": 2,
   "extracted_char_count": 56,
+  "chunk_count": 2,
   "pages": [
     {"page_number": 1, "text": "…", "char_count": 35, "is_empty": false}
+  ],
+  "chunks": [
+    {
+      "id": "379ebe97…:0",
+      "document_id": "379ebe97…",
+      "page_number": 1,
+      "chunk_index": 0,
+      "text": "…",
+      "char_count": 35,
+      "start_offset": 0,
+      "end_offset": 35
+    }
   ],
   "warnings": [],
   "status": "processed"
@@ -112,6 +127,23 @@ Lists uploaded documents (id, filename, size, page count, status).
 ### `GET /api/v1/documents/{id}`
 
 Returns the full document record, or `404` if unknown.
+
+## Chunking
+
+Text is chunked **per page** during upload, so every chunk maps to exactly one
+page and citations can never be ambiguous.
+
+- Sliding window of `chunk_size` characters with `chunk_overlap` characters of
+  overlap between consecutive chunks.
+- Cut points prefer paragraph breaks (`\n\n`), then line breaks, then sentence
+  endings (`. ? !` followed by whitespace), then spaces — falling back to a
+  hard cut only for unbreakable runs (e.g. long URLs).
+- Cuts never fall below half the requested window, keeping chunks substantive.
+- Chunks are exact slices of the page text: `page.text[start_offset:end_offset]
+  == chunk.text` always holds. Nothing is trimmed, so offsets stay truthful.
+- Blank pages produce no chunks, but later pages keep their true page numbers.
+- Chunk ids are deterministic: `{document_id}:{chunk_index}`, with
+  `chunk_index` sequential across the document in page order.
 
 ### Error model
 
@@ -148,9 +180,10 @@ app/
   processing/              # pipeline, independent of HTTP
     validation.py          # filename/type/size/magic-byte checks
     extraction.py          # PyMuPDF page-level extraction
+    chunking.py            # boundary-aware chunking with source offsets
   repository/              # DocumentStore protocol + in-memory impl
   schemas/                 # Pydantic response models
-tests/                     # pytest suite (24 tests)
+tests/                     # pytest suite (40 tests)
 ```
 
 ## Security notes (Milestone 1)
@@ -166,6 +199,8 @@ tests/                     # pytest suite (24 tests)
 
 - Document storage is **in-memory only**; data is lost on restart
   (PostgreSQL arrives in Milestone 4).
+- Chunks never span page boundaries; a sentence split across a page break is
+  chunked separately on each page (keeps citations exact).
 - No authentication/authorization yet (Milestone 4).
 - Scanned/image-only PDFs extract zero text; OCR is a later phase.
 - Pathological PDFs that hang the parser are not time-limited yet.

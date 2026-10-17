@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Protocol
 
-from app.schemas.documents import PageExtraction
+from app.schemas.documents import Chunk, PageExtraction
 
 
 @dataclass
@@ -14,6 +14,7 @@ class DocumentRecord:
     page_count: int
     extracted_char_count: int
     pages: list[PageExtraction]
+    chunks: list[Chunk]
     warnings: list[str]
     status: str = "processed"
 

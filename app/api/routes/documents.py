@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile
 
 from app.config import Settings
 from app.core.errors import DocumentNotFoundError, FileTooLargeError
+from app.processing.chunking import ChunkingConfig, chunk_pages
 from app.processing.extraction import extract_pages
 from app.processing.validation import (
     ensure_pdf_magic,
@@ -34,6 +35,10 @@ def get_app_settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
+def chunking_config_from_settings(settings: Settings) -> ChunkingConfig:
+    return ChunkingConfig(chunk_size=settings.chunk_size, chunk_overlap=settings.chunk_overlap)
+
+
 async def read_upload_limited(file: UploadFile, max_bytes: int) -> bytes:
     """Stream the upload in chunks, aborting as soon as the limit is exceeded."""
     buffer = bytearray()
@@ -55,7 +60,9 @@ def record_to_response(record: DocumentRecord) -> DocumentResponse:
         size_bytes=record.size_bytes,
         page_count=record.page_count,
         extracted_char_count=record.extracted_char_count,
+        chunk_count=len(record.chunks),
         pages=record.pages,
+        chunks=record.chunks,
         warnings=record.warnings,
         status=record.status,
     )
@@ -73,14 +80,21 @@ async def upload_document(
     ensure_pdf_magic(data)
 
     extracted = extract_pages(data)
+    record_id = uuid.uuid4().hex
+    chunks = chunk_pages(
+        document_id=record_id,
+        pages=extracted.pages,
+        config=chunking_config_from_settings(settings),
+    )
     record = DocumentRecord(
-        id=uuid.uuid4().hex,
+        id=record_id,
         filename=filename,
         content_type=file.content_type,
         size_bytes=len(data),
         page_count=extracted.page_count,
         extracted_char_count=extracted.extracted_char_count,
         pages=list(extracted.pages),
+        chunks=chunks,
         warnings=list(extracted.warnings),
     )
     store.add(record)
@@ -95,6 +109,7 @@ def list_documents(store: DocumentStore = Depends(get_document_store)) -> list[D
             filename=record.filename,
             size_bytes=record.size_bytes,
             page_count=record.page_count,
+            chunk_count=len(record.chunks),
             status=record.status,
         )
         for record in store.list()
