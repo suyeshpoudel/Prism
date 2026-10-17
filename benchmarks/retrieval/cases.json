@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "id": "photo-light-reactions",
+      "question": "Where do the light-dependent reactions of photosynthesis take place and what do they produce?",
+      "relevant": [{"filename": "plant-photosynthesis.pdf", "page_number": 2}]
+    },
+    {
+      "id": "photo-calvin-cycle",
+      "question": "How does the Calvin cycle fix carbon dioxide into sugar?",
+      "relevant": [{"filename": "plant-photosynthesis.pdf", "page_number": 3}]
+    },
+    {
+      "id": "quantum-superposition",
+      "question": "What is a qubit superposition and how does it differ from a classical bit?",
+      "relevant": [{"filename": "quantum-computing.pdf", "page_number": 1}]
+    },
+    {
+      "id": "quantum-error-correction",
+      "question": "How do quantum error correction codes protect logical qubits from noise?",
+      "relevant": [{"filename": "quantum-computing.pdf", "page_number": 3}]
+    },
+    {
+      "id": "pasta-salted-water",
+      "question": "How much salt should be added to the water when boiling pasta?",
+      "relevant": [{"filename": "pasta-cooking.pdf", "page_number": 1}]
+    },
+    {
+      "id": "pasta-sauce-pairing",
+      "question": "Which pasta shapes pair best with chunky sauces and why?",
+      "relevant": [{"filename": "pasta-cooking.pdf", "page_number": 3}]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "documents": [
+    {
+      "filename": "plant-photosynthesis.pdf",
+      "pages": [
+        "Photosynthesis converts light energy into chemical energy stored in glucose. In plants it takes place in chloroplasts, organelles containing stacks of thylakoid membranes. The overall reaction combines carbon dioxide and water using light energy, producing sugar and releasing oxygen as a byproduct. The rate of photosynthesis depends on light intensity, carbon dioxide concentration, and temperature.",
+        "The light-dependent reactions occur in the thylakoid membranes. Chlorophyll and other pigments absorb photons and excite electrons, which pass along an electron transport chain. This flow of electrons pumps protons into the thylakoid lumen, building a gradient that ATP synthase uses to produce ATP. Water molecules are split to replace the donated electrons, releasing oxygen gas. The products ATP and NADPH store energy for the next stage.",
+        "The Calvin cycle, also called light-independent reactions, takes place in the stroma of the chloroplast. The enzyme RuBisCO fixes carbon dioxide by attaching it to ribulose bisphosphate. A series of reduction reactions powered by ATP and NADPH from the light reactions builds glyceraldehyde-3-phosphate, which the plant can turn into glucose and other organic molecules. The cycle then regenerates its starting compound to keep fixing carbon."
+      ]
+    },
+    {
+      "filename": "quantum-computing.pdf",
+      "pages": [
+        "Classical computers store information as bits, which are always either zero or one. A quantum computer uses qubits, which can exist in a superposition of zero and one until measured. Superposition lets a register of n qubits represent 2^n amplitudes at once, but measurement collapses the state to a single outcome. Algorithms exploit interference to amplify the probability of correct answers and cancel wrong ones.",
+        "Entanglement links qubits so that the state of one cannot be described independently of the others. Two entangled qubits can encode correlations that no classical bits can reproduce, which quantum gates use to move information across a register quickly. Maintaining entanglement is fragile: interaction with the environment causes decoherence, destroying the quantum information the computation depends on.",
+        "Quantum error correction encodes a single logical qubit into many physical qubits. Stabilizer codes such as the surface code detect bit-flip and phase-flip errors by measuring parity checks without reading the data itself. Because error rates grow with circuit size, fault-tolerant quantum computing requires physical error rates below a threshold, often quoted around one percent for the surface code, and many physical qubits per logical qubit."
+      ]
+    },
+    {
+      "filename": "pasta-cooking.pdf",
+      "pages": [
+        "Good pasta starts with the water. Use a large pot so the pasta can move freely, and bring the water to a rolling boil before adding the pasta. Salt the water generously; it should taste noticeably like seawater, roughly ten grams of salt per liter. Salting at the boil prevents the salt from pitting the pot and seasons the pasta from the inside as it absorbs water.",
+        "Cooking time depends on shape and drying method. Dried pasta from commercial extrusion usually needs eight to twelve minutes, while fresh egg pasta may be done in two to four minutes. Stir during the first minute so strands do not stick. The target texture is al dente: cooked through but with a firm bite at the center. Start tasting a minute before the package time and reserve a cup of starchy pasta water before draining.",
+        "Sauce choice should match the shape. Thin oil-based sauces cling to long strands like spaghetti and linguine. Chunky meat or vegetable sauces pair well with short tubular shapes such as rigatoni that trap pieces inside. Delicate cream sauces suit filled pastas like ravioli. Finish the pasta in the pan with a splash of the reserved pasta water; its starch helps the sauce emulsify and adhere instead of pooling on the plate."
+      ]
+    }
+  ]
+}

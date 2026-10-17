@@ -3,6 +3,8 @@ from functools import lru_cache
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.embedding.provider import DEFAULT_EMBEDDING_MODEL
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -15,6 +17,9 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 10 * 1024 * 1024
     chunk_size: int = 1000
     chunk_overlap: int = 150
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL
+    embedding_batch_size: int = 32
+    default_top_k: int = 5
 
     @model_validator(mode="after")
     def _validate_chunking(self) -> "Settings":

@@ -1,9 +1,12 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+import numpy as np
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from app.config import Settings
-from app.core.errors import DocumentNotFoundError, FileTooLargeError
+from app.core.errors import DocumentNotFoundError, EmbeddingFailedError, FileTooLargeError, InvalidRequestError
+from app.embedding import Embedder
+from app.embedding.provider import EmbeddingError
 from app.processing.chunking import ChunkingConfig, chunk_pages
 from app.processing.extraction import extract_pages
 from app.processing.validation import (
@@ -12,11 +15,13 @@ from app.processing.validation import (
     validate_media_type,
 )
 from app.repository import DocumentRecord, DocumentStore
+from app.retrieval import IndexEntry, NumpyVectorIndex, VectorIndex
 from app.schemas.documents import DocumentResponse, DocumentSummary, ErrorResponse
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 READ_CHUNK_BYTES = 64 * 1024
+MAX_COLLECTION_ID_LENGTH = 128
 
 ERROR_RESPONSES = {
     400: {"model": ErrorResponse},
@@ -24,6 +29,7 @@ ERROR_RESPONSES = {
     413: {"model": ErrorResponse},
     415: {"model": ErrorResponse},
     422: {"model": ErrorResponse},
+    500: {"model": ErrorResponse},
 }
 
 
@@ -35,8 +41,55 @@ def get_app_settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
+def get_embedder(request: Request) -> Embedder:
+    return request.app.state.embedder
+
+
+def get_vector_index(request: Request) -> NumpyVectorIndex:
+    return request.app.state.vector_index
+
+
 def chunking_config_from_settings(settings: Settings) -> ChunkingConfig:
     return ChunkingConfig(chunk_size=settings.chunk_size, chunk_overlap=settings.chunk_overlap)
+
+
+def normalize_collection_id(collection_id: str | None) -> str:
+    cleaned = (collection_id or "default").strip()
+    if not cleaned:
+        raise InvalidRequestError("collection_id must not be empty.")
+    if len(cleaned) > MAX_COLLECTION_ID_LENGTH:
+        raise InvalidRequestError(
+            f"collection_id must be at most {MAX_COLLECTION_ID_LENGTH} characters."
+        )
+    return cleaned
+
+
+def index_chunks(
+    *,
+    index: VectorIndex,
+    embedder: Embedder,
+    chunks: list,
+    filename: str,
+    collection_id: str,
+    batch_size: int,
+) -> None:
+    if not chunks:
+        return
+    entries = [
+        IndexEntry(chunk=chunk, filename=filename, collection_id=collection_id)
+        for chunk in chunks
+    ]
+    try:
+        vectors = []
+        for start in range(0, len(chunks), batch_size):
+            batch = chunks[start : start + batch_size]
+            vectors.append(embedder.embed_texts([chunk.text for chunk in batch]))
+        matrix = np.vstack(vectors).astype(np.float32)
+        index.add(entries, matrix)
+    except EmbeddingError as exc:
+        raise EmbeddingFailedError(
+            "The embedding model failed while processing this document."
+        ) from exc
 
 
 async def read_upload_limited(file: UploadFile, max_bytes: int) -> bytes:
@@ -71,10 +124,14 @@ def record_to_response(record: DocumentRecord) -> DocumentResponse:
 @router.post("", response_model=DocumentResponse, status_code=201, responses=ERROR_RESPONSES)
 async def upload_document(
     file: UploadFile = File(...),
+    collection_id: str | None = Form(default=None),
     store: DocumentStore = Depends(get_document_store),
     settings: Settings = Depends(get_app_settings),
+    embedder: Embedder = Depends(get_embedder),
+    index: NumpyVectorIndex = Depends(get_vector_index),
 ) -> DocumentResponse:
     filename = validate_media_type(file.filename, file.content_type)
+    collection = normalize_collection_id(collection_id)
     data = await read_upload_limited(file, settings.max_upload_bytes)
     ensure_size_within_limit(data, settings.max_upload_bytes)
     ensure_pdf_magic(data)
@@ -86,6 +143,14 @@ async def upload_document(
         pages=extracted.pages,
         config=chunking_config_from_settings(settings),
     )
+    index_chunks(
+        index=index,
+        embedder=embedder,
+        chunks=chunks,
+        filename=filename,
+        collection_id=collection,
+        batch_size=settings.embedding_batch_size,
+    )
     record = DocumentRecord(
         id=record_id,
         filename=filename,
@@ -96,6 +161,7 @@ async def upload_document(
         pages=list(extracted.pages),
         chunks=chunks,
         warnings=list(extracted.warnings),
+        collection_id=collection,
     )
     store.add(record)
     return record_to_response(record)

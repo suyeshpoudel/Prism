@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from tests.embedding_stub import HashingEmbedder
 from tests.pdf_helpers import make_pdf
 
 
@@ -13,12 +14,12 @@ def settings() -> Settings:
 
 @pytest.fixture
 def client(settings: Settings) -> TestClient:
-    return TestClient(create_app(settings))
+    return TestClient(create_app(settings, embedder=HashingEmbedder()))
 
 
 @pytest.fixture
 def tight_client() -> TestClient:
-    return TestClient(create_app(Settings(max_upload_bytes=100)))
+    return TestClient(create_app(Settings(max_upload_bytes=100), embedder=HashingEmbedder()))
 
 
 @pytest.fixture

@@ -16,6 +16,7 @@ class DocumentRecord:
     pages: list[PageExtraction]
     chunks: list[Chunk]
     warnings: list[str]
+    collection_id: str = "default"
     status: str = "processed"
 
 

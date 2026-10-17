@@ -49,6 +49,11 @@ class EncryptedPDFError(PrismError):
     code = "encrypted_pdf"
 
 
+class EmbeddingFailedError(PrismError):
+    status_code = 500
+    code = "embedding_failed"
+
+
 def error_body(exc: PrismError) -> dict:
     return {"error": {"code": exc.code, "message": exc.message}}
 

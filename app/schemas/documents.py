@@ -56,3 +56,23 @@ class DocumentSummary(BaseModel):
     page_count: int
     chunk_count: int
     status: str
+
+
+class SearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=2000)
+    top_k: int | None = Field(default=None, ge=1, le=50)
+    collection_id: str = Field(default="default", min_length=1, max_length=128)
+
+
+class SearchResult(BaseModel):
+    score: float
+    chunk: Chunk
+    document_id: str
+    filename: str
+
+
+class SearchResponse(BaseModel):
+    query: str
+    top_k: int
+    collection_id: str
+    results: list[SearchResult]
