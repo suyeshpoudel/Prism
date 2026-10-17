@@ -1,0 +1,4 @@
+# ML / retrieval stack (Milestone 3+). Heavyweight — install separately.
+sentence-transformers==6.1.0
+torch==2.14.1
+transformers==5.20.1

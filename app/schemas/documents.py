@@ -1,0 +1,44 @@
+from pydantic import BaseModel, Field
+
+
+class ErrorBody(BaseModel):
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorBody
+
+
+class HealthResponse(BaseModel):
+    status: str = "ok"
+    service: str
+    version: str
+    environment: str
+
+
+class PageExtraction(BaseModel):
+    page_number: int = Field(ge=1)
+    text: str
+    char_count: int = Field(ge=0)
+    is_empty: bool
+
+
+class DocumentResponse(BaseModel):
+    id: str
+    filename: str
+    content_type: str | None
+    size_bytes: int
+    page_count: int
+    extracted_char_count: int
+    pages: list[PageExtraction]
+    warnings: list[str]
+    status: str
+
+
+class DocumentSummary(BaseModel):
+    id: str
+    filename: str
+    size_bytes: int
+    page_count: int
+    status: str

@@ -1,0 +1,13 @@
+# Core runtime (Milestone 1). Pinned to versions verified locally.
+fastapi==0.143.3
+starlette==1.8.0
+uvicorn==0.54.0
+pydantic==2.14.1
+pydantic-settings==2.16.0
+python-multipart==0.0.32
+pymupdf==1.28.2
+numpy==2.5.4
+
+# Testing
+pytest==9.1.1
+httpx==0.28.1
