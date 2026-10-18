@@ -54,6 +54,11 @@ class EmbeddingFailedError(PrismError):
     code = "embedding_failed"
 
 
+class UnauthorizedError(PrismError):
+    status_code = 401
+    code = "unauthorized"
+
+
 def error_body(exc: PrismError) -> dict:
     return {"error": {"code": exc.code, "message": exc.message}}
 

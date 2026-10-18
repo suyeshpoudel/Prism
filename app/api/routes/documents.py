@@ -4,7 +4,13 @@ import numpy as np
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from app.config import Settings
-from app.core.errors import DocumentNotFoundError, EmbeddingFailedError, FileTooLargeError, InvalidRequestError
+from app.core.auth import get_current_owner
+from app.core.errors import (
+    DocumentNotFoundError,
+    EmbeddingFailedError,
+    FileTooLargeError,
+    InvalidRequestError,
+)
 from app.embedding import Embedder
 from app.embedding.provider import EmbeddingError
 from app.processing.chunking import ChunkingConfig, chunk_pages
@@ -15,7 +21,7 @@ from app.processing.validation import (
     validate_media_type,
 )
 from app.repository import DocumentRecord, DocumentStore
-from app.retrieval import IndexEntry, NumpyVectorIndex, VectorIndex
+from app.retrieval import NumpyVectorIndex, VectorIndex, entries_for_record, rebuild_index
 from app.schemas.documents import DocumentResponse, DocumentSummary, ErrorResponse
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -25,6 +31,7 @@ MAX_COLLECTION_ID_LENGTH = 128
 
 ERROR_RESPONSES = {
     400: {"model": ErrorResponse},
+    401: {"model": ErrorResponse},
     404: {"model": ErrorResponse},
     413: {"model": ErrorResponse},
     415: {"model": ErrorResponse},
@@ -64,32 +71,48 @@ def normalize_collection_id(collection_id: str | None) -> str:
     return cleaned
 
 
-def index_chunks(
+def embed_chunks(
     *,
-    index: VectorIndex,
     embedder: Embedder,
     chunks: list,
-    filename: str,
-    collection_id: str,
     batch_size: int,
-) -> None:
+) -> np.ndarray:
+    """Embed chunks in batches; returns a float32 matrix (one row per chunk)."""
     if not chunks:
-        return
-    entries = [
-        IndexEntry(chunk=chunk, filename=filename, collection_id=collection_id)
-        for chunk in chunks
-    ]
+        return np.empty((0, 0), dtype=np.float32)
     try:
-        vectors = []
+        batches = []
         for start in range(0, len(chunks), batch_size):
             batch = chunks[start : start + batch_size]
-            vectors.append(embedder.embed_texts([chunk.text for chunk in batch]))
-        matrix = np.vstack(vectors).astype(np.float32)
-        index.add(entries, matrix)
+            batches.append(embedder.embed_texts([chunk.text for chunk in batch]))
+        return np.vstack(batches).astype(np.float32)
     except EmbeddingError as exc:
         raise EmbeddingFailedError(
             "The embedding model failed while processing this document."
         ) from exc
+
+
+def index_document(
+    *,
+    index: VectorIndex,
+    record: DocumentRecord,
+    embeddings: np.ndarray,
+) -> None:
+    if not record.chunks:
+        return
+    index.add(entries_for_record(record), embeddings)
+
+
+def reindex_from_store(
+    *,
+    index_target: NumpyVectorIndex,
+    store: DocumentStore,
+    settings: Settings,
+) -> None:
+    """Rebuild a fresh index from persisted data and swap it onto app.state."""
+    fresh = NumpyVectorIndex()
+    rebuild_index(fresh, store.load_all_with_embeddings(), expected_model=settings.embedding_model)
+    index_target.swap(fresh)
 
 
 async def read_upload_limited(file: UploadFile, max_bytes: int) -> bytes:
@@ -125,6 +148,7 @@ def record_to_response(record: DocumentRecord) -> DocumentResponse:
 async def upload_document(
     file: UploadFile = File(...),
     collection_id: str | None = Form(default=None),
+    owner_id: str = Depends(get_current_owner),
     store: DocumentStore = Depends(get_document_store),
     settings: Settings = Depends(get_app_settings),
     embedder: Embedder = Depends(get_embedder),
@@ -143,12 +167,9 @@ async def upload_document(
         pages=extracted.pages,
         config=chunking_config_from_settings(settings),
     )
-    index_chunks(
-        index=index,
+    embeddings = embed_chunks(
         embedder=embedder,
         chunks=chunks,
-        filename=filename,
-        collection_id=collection,
         batch_size=settings.embedding_batch_size,
     )
     record = DocumentRecord(
@@ -162,13 +183,19 @@ async def upload_document(
         chunks=chunks,
         warnings=list(extracted.warnings),
         collection_id=collection,
+        owner_id=owner_id,
+        embedding_model=settings.embedding_model,
     )
-    store.add(record)
+    store.add(record, embeddings)
+    index_document(index=index, record=record, embeddings=embeddings)
     return record_to_response(record)
 
 
 @router.get("", response_model=list[DocumentSummary], responses=ERROR_RESPONSES)
-def list_documents(store: DocumentStore = Depends(get_document_store)) -> list[DocumentSummary]:
+def list_documents(
+    owner_id: str = Depends(get_current_owner),
+    store: DocumentStore = Depends(get_document_store),
+) -> list[DocumentSummary]:
     return [
         DocumentSummary(
             id=record.id,
@@ -178,15 +205,31 @@ def list_documents(store: DocumentStore = Depends(get_document_store)) -> list[D
             chunk_count=len(record.chunks),
             status=record.status,
         )
-        for record in store.list()
+        for record in store.list(owner_id=owner_id)
     ]
 
 
 @router.get("/{document_id}", response_model=DocumentResponse, responses=ERROR_RESPONSES)
 def get_document(
-    document_id: str, store: DocumentStore = Depends(get_document_store)
+    document_id: str,
+    owner_id: str = Depends(get_current_owner),
+    store: DocumentStore = Depends(get_document_store),
 ) -> DocumentResponse:
-    record = store.get(document_id)
+    record = store.get(document_id, owner_id=owner_id)
     if record is None:
         raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
     return record_to_response(record)
+
+
+@router.delete("/{document_id}", status_code=204, responses=ERROR_RESPONSES)
+def delete_document(
+    document_id: str,
+    owner_id: str = Depends(get_current_owner),
+    store: DocumentStore = Depends(get_document_store),
+    index: NumpyVectorIndex = Depends(get_vector_index),
+    settings: Settings = Depends(get_app_settings),
+) -> None:
+    deleted = store.delete(document_id, owner_id=owner_id)
+    if not deleted:
+        raise DocumentNotFoundError(f"Document '{document_id}' was not found.")
+    reindex_from_store(index_target=index, store=store, settings=settings)

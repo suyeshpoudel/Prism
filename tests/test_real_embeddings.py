@@ -31,8 +31,16 @@ PASTA_PAGE = (
 
 
 @pytest.fixture(scope="module")
-def real_client() -> TestClient:
-    return TestClient(create_app(Settings(max_upload_bytes=1_000_000)))
+def real_client(tmp_path_factory) -> TestClient:
+    db_path = tmp_path_factory.mktemp("real-embeddings-db") / "real.db"
+    settings = Settings(
+        max_upload_bytes=1_000_000,
+        database_url=f"sqlite+pysqlite:///{db_path}",
+        api_keys={"real-key": "real-owner"},
+    )
+    with TestClient(create_app(settings)) as client:
+        client.headers.update({"X-API-Key": "real-key"})
+        yield client
 
 
 def test_real_embedder_produces_normalized_shapes():

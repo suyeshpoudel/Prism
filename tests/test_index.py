@@ -18,9 +18,17 @@ def make_chunk(chunk_id: str = "d:0", page_number: int = 1) -> Chunk:
     )
 
 
-def make_entry(chunk_id: str, collection_id: str = "default", page_number: int = 1) -> IndexEntry:
+def make_entry(
+    chunk_id: str,
+    collection_id: str = "default",
+    page_number: int = 1,
+    owner_id: str = "owner",
+) -> IndexEntry:
     return IndexEntry(
-        chunk=make_chunk(chunk_id, page_number), filename="f.pdf", collection_id=collection_id
+        chunk=make_chunk(chunk_id, page_number),
+        filename="f.pdf",
+        collection_id=collection_id,
+        owner_id=owner_id,
     )
 
 
@@ -99,6 +107,44 @@ def test_collection_isolation_filters_other_collections():
 
     assert {r.entry.collection_id for r in results} == {"alpha"}
     assert [r.entry.chunk.id for r in results] == ["alpha-1", "alpha-2"]
+
+
+def test_owner_isolation_filters_other_owners():
+    index = NumpyVectorIndex()
+    index.add(
+        [
+            make_entry("alice-1", owner_id="alice"),
+            make_entry("bob-1", owner_id="bob"),
+            make_entry("alice-2", owner_id="alice"),
+        ],
+        np.array([[1.0, 0.0], [1.0, 0.0], [0.9, 0.1]], dtype=np.float32),
+    )
+
+    results = index.search(np.array([1.0, 0.0], dtype=np.float32), top_k=10, owner_id="alice")
+
+    assert {r.entry.owner_id for r in results} == {"alice"}
+    assert [r.entry.chunk.id for r in results] == ["alice-1", "alice-2"]
+
+
+def test_owner_and_collection_filters_combine():
+    index = NumpyVectorIndex()
+    index.add(
+        [
+            make_entry("keep", collection_id="alpha", owner_id="alice"),
+            make_entry("same-owner-other-collection", collection_id="beta", owner_id="alice"),
+            make_entry("other-owner-same-collection", collection_id="alpha", owner_id="bob"),
+        ],
+        np.array([[1.0, 0.0], [1.0, 0.0], [1.0, 0.0]], dtype=np.float32),
+    )
+
+    results = index.search(
+        np.array([1.0, 0.0], dtype=np.float32),
+        top_k=10,
+        collection_id="alpha",
+        owner_id="alice",
+    )
+
+    assert [r.entry.chunk.id for r in results] == ["keep"]
 
 
 def test_search_without_filter_returns_all_collections():

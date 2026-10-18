@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     embedding_model: str = DEFAULT_EMBEDDING_MODEL
     embedding_batch_size: int = 32
     default_top_k: int = 5
+    database_url: str = "postgresql+psycopg://prism:prism@localhost:5432/prism"
+    api_keys: dict[str, str] = {}
+    auto_create_schema: bool = True
 
     @model_validator(mode="after")
     def _validate_chunking(self) -> "Settings":

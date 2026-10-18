@@ -11,3 +11,7 @@ dist/
 build/
 .mypy_cache/
 .ruff_cache/
+*.db
+*.sqlite
+*.sqlite3
+.sisyphus/

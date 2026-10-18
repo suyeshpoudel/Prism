@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from tests.conftest import TEST_API_KEY, TEST_OWNER
 from tests.embedding_stub import FailingEmbedder, HashingEmbedder
 from tests.pdf_helpers import make_pdf
 
@@ -103,24 +104,31 @@ def test_upload_rejects_blank_collection_id(client):
     assert response.status_code == 400
 
 
-def test_upload_embedding_failure_returns_500():
-    app_client = TestClient(
-        create_app(Settings(max_upload_bytes=1_000_000), embedder=FailingEmbedder())
+def test_upload_embedding_failure_returns_500(db_url):
+    settings = Settings(
+        max_upload_bytes=1_000_000,
+        database_url=db_url,
+        api_keys={TEST_API_KEY: TEST_OWNER},
     )
-
-    response = app_client.post(
-        "/api/v1/documents",
-        files={"file": ("a.pdf", make_pdf(["text"]), "application/pdf")},
-    )
+    with TestClient(create_app(settings, embedder=FailingEmbedder())) as app_client:
+        app_client.headers.update({"X-API-Key": TEST_API_KEY})
+        response = app_client.post(
+            "/api/v1/documents",
+            files={"file": ("a.pdf", make_pdf(["text"]), "application/pdf")},
+        )
 
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "embedding_failed"
 
 
-def test_search_embedding_failure_returns_500():
-    app_client = TestClient(create_app(Settings(), embedder=FailingEmbedder()))
-
-    response = app_client.post("/api/v1/search", json={"query": "anything"})
+def test_search_embedding_failure_returns_500(db_url):
+    settings = Settings(
+        database_url=db_url,
+        api_keys={TEST_API_KEY: TEST_OWNER},
+    )
+    with TestClient(create_app(settings, embedder=FailingEmbedder())) as app_client:
+        app_client.headers.update({"X-API-Key": TEST_API_KEY})
+        response = app_client.post("/api/v1/search", json={"query": "anything"})
 
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "embedding_failed"

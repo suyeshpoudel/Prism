@@ -13,6 +13,7 @@ from app.schemas.documents import PageExtraction
 
 DEFAULT_K_VALUES = (1, 3, 5)
 BENCHMARK_COLLECTION = "benchmark"
+BENCHMARK_OWNER = "benchmark"
 
 
 @dataclass(frozen=True)
@@ -82,7 +83,12 @@ def _build_index(
         )
         for chunk in chunks:
             entries.append(
-                IndexEntry(chunk=chunk, filename=document.filename, collection_id=BENCHMARK_COLLECTION)
+                IndexEntry(
+                    chunk=chunk,
+                    filename=document.filename,
+                    collection_id=BENCHMARK_COLLECTION,
+                    owner_id=BENCHMARK_OWNER,
+                )
             )
 
     embedding_start = time.perf_counter()

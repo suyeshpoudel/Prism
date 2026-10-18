@@ -194,18 +194,26 @@ def test_upload_returns_chunks_with_source_metadata(client, pdf_bytes):
         assert page["text"][chunk["start_offset"] : chunk["end_offset"]] == chunk["text"]
 
 
-def test_upload_respects_chunk_settings_from_settings(pdf_bytes):
+def test_upload_respects_chunk_settings_from_settings(pdf_bytes, db_url):
     from fastapi.testclient import TestClient
 
     from app.config import Settings
+    from tests.conftest import TEST_API_KEY, TEST_OWNER
+    from tests.embedding_stub import HashingEmbedder
 
-    app_client = TestClient(
-        create_app(Settings(max_upload_bytes=1_000_000, chunk_size=20, chunk_overlap=5))
+    settings = Settings(
+        max_upload_bytes=1_000_000,
+        chunk_size=20,
+        chunk_overlap=5,
+        database_url=db_url,
+        api_keys={TEST_API_KEY: TEST_OWNER},
     )
-    response = app_client.post(
-        "/api/v1/documents",
-        files={"file": ("research.pdf", pdf_bytes, "application/pdf")},
-    )
+    with TestClient(create_app(settings, embedder=HashingEmbedder())) as app_client:
+        app_client.headers.update({"X-API-Key": TEST_API_KEY})
+        response = app_client.post(
+            "/api/v1/documents",
+            files={"file": ("research.pdf", pdf_bytes, "application/pdf")},
+        )
 
     body = response.json()
     assert body["chunk_count"] > 1
