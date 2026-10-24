@@ -89,6 +89,20 @@ the local embedding model (~90 MB).
 frontend build (`http://localhost:8000` by default). `PRISM_CORS_ORIGINS` is a
 JSON array of allowed browser origins.
 
+If ports 3000 or 8000 are already in use, pick free host ports and keep the API
+URL and CORS origin in sync. For example, in `.env`:
+
+```bash
+PRISM_FRONTEND_PORT=3100
+PRISM_BACKEND_PORT=8010
+PRISM_PUBLIC_API_URL=http://localhost:8010
+PRISM_CORS_ORIGINS=["http://localhost:3100"]
+```
+
+Then run `docker compose up -d --build`. The rebuild is required because the
+public API URL is compiled into the frontend image. The UI is then at
+http://localhost:3100 and the API at http://localhost:8010.
+
 ## Local development
 
 ### Backend
