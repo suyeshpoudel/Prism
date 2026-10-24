@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.main import create_app
 from tests.embedding_stub import HashingEmbedder
+from tests.llm_stub import StubLLMProvider
 from tests.pdf_helpers import make_pdf
 
 TEST_API_KEY = "test-key"
@@ -18,17 +19,18 @@ def db_url(tmp_path) -> str:
 
 
 @pytest.fixture
-def settings(db_url: str) -> Settings:
+def settings(db_url: str, tmp_path) -> Settings:
     return Settings(
         max_upload_bytes=1_000_000,
         database_url=db_url,
         api_keys={TEST_API_KEY: TEST_OWNER, SECOND_OWNER_KEY: SECOND_OWNER},
+        evaluation_results_dir=tmp_path / "evaluation-results",
     )
 
 
 @pytest.fixture
 def client(settings: Settings) -> TestClient:
-    app = create_app(settings, embedder=HashingEmbedder())
+    app = create_app(settings, embedder=HashingEmbedder(), llm=StubLLMProvider())
     with TestClient(app) as test_client:
         test_client.headers.update({"X-API-Key": TEST_API_KEY})
         yield test_client

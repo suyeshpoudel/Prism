@@ -15,3 +15,9 @@ build/
 *.sqlite
 *.sqlite3
 .sisyphus/
+
+# Evaluation artifacts and frontend build output
+benchmarks/results/
+node_modules/
+.next/
+*.tsbuildinfo

@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: prism
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prism}
+      POSTGRES_DB: prism
+    volumes:
+      - prism-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prism -d prism"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      PRISM_DATABASE_URL: postgresql+psycopg://prism:${POSTGRES_PASSWORD:-prism}@db:5432/prism
+      PRISM_AUTO_CREATE_SCHEMA: "false"
+      HF_HOME: /home/prism/.cache/huggingface
+    ports:
+      - "8000:8000"
+    volumes:
+      - prism-models:/home/prism/.cache/huggingface
+      - prism-evaluation:/app/benchmarks/results
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_PRISM_API_URL: ${PRISM_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  prism-db:
+  prism-models:
+  prism-evaluation:

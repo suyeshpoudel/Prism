@@ -59,6 +59,21 @@ class UnauthorizedError(PrismError):
     code = "unauthorized"
 
 
+class AnswerUnavailableError(PrismError):
+    status_code = 503
+    code = "answer_generation_unavailable"
+
+
+class AnswerGenerationFailedError(PrismError):
+    status_code = 502
+    code = "answer_generation_failed"
+
+
+class EvaluationRunNotFoundError(PrismError):
+    status_code = 404
+    code = "evaluation_run_not_found"
+
+
 def error_body(exc: PrismError) -> dict:
     return {"error": {"code": exc.code, "message": exc.message}}
 

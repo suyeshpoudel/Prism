@@ -31,3 +31,19 @@ def test_module_level_app_wires_routers():
     assert "/health" in paths
     assert "/api/v1/documents" in paths
     assert "/api/v1/search" in paths
+    assert "/api/v1/answer" in paths
+    assert "/api/v1/evaluation/retrieval" in paths
+    assert "/api/v1/evaluation/answers" in paths
+
+
+def test_cors_allows_configured_frontend_origin(client):
+    response = client.options(
+        "/api/v1/documents",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "x-api-key",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"

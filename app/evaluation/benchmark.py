@@ -57,7 +57,7 @@ def load_benchmark(
     return documents, cases
 
 
-def _build_index(
+def build_corpus_index(
     *,
     embedder: Embedder,
     documents: list[BenchmarkDocument],
@@ -101,6 +101,9 @@ def _build_index(
     if entries:
         index.add(entries, matrix)
     return index, len(entries), embedding_ms
+
+
+_build_index = build_corpus_index
 
 
 def run_benchmark(

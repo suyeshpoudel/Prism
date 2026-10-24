@@ -1,4 +1,4 @@
-# Core runtime (Milestones 1-4). Pinned to versions verified locally.
+# Core runtime (Milestones 1-6). Pinned to versions verified locally.
 fastapi==0.143.3
 starlette==1.8.0
 uvicorn==0.54.0
@@ -7,6 +7,7 @@ pydantic-settings==2.16.0
 python-multipart==0.0.32
 pymupdf==1.28.2
 numpy==2.5.4
+httpx==0.28.1
 
 # Database (Milestone 4)
 sqlalchemy==2.1.5
@@ -15,4 +16,3 @@ alembic==1.20.0
 
 # Testing
 pytest==9.1.1
-httpx==0.28.1
